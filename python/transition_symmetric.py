@@ -78,21 +78,19 @@ class Transition(object):
         return output
 
     def diagonal(self,conf,A):
+        """ returns diagonal contribution"""
         contrib=1.0
         cconf=conf.get()
         size=conf.get_dimension()
         for k in range(size):
             for rule in (self.rules.get(cconf[k]) or []):
                 contrib=contrib - rule[1]
-                print(conf,rule,' one',contrib)
-                
         for j in range(size):
             sj     =cconf[j]
             for i in range((j+1),size): 
                 pair = sj+cconf[i]
                 for rule in (self.rules.get(pair) or []):
                     contrib=contrib - rule[1]*A[j][i]
-                    print(conf,rule,' two',contrib)
         return contrib
     
     def compute_column(self,conf,A):
@@ -139,17 +137,19 @@ class Transition(object):
     def get_eigenvals(self):
         return scipy.linalg.eigvals(self.get_matrix()[0])
 
+    
+
 if __name__ == "__main__":
     
     import sys
     from timeit import default_timer as timer
     from configuration import Configuration
 
-    beta =0.001
-    alpha=0.100
-    rules={'1':[('0',beta)], '01':[('11',alpha)], '10':[('11',alpha)]}
+    gamma=0.001
+    beta =0.100
+    rules={'1':[('0',gamma)], '01':[('11',beta)], '10':[('11',beta)]}
     base =2
-    N    =4
+    N    =8
 
     
     Nmax=20
@@ -158,9 +158,6 @@ if __name__ == "__main__":
     time=[0]*Nmax
     
 
-    import resource
-    print('Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
-
     t1=timer()
     Configuration.init_globals(base,N)
     adjacency=[ [1]*N for i in range(N) ]
@@ -168,15 +165,16 @@ if __name__ == "__main__":
         adjacency[k][k]=0
     T=Transition(Configuration,rules)
     T.compute(adjacency)
-    print('Elapsed time: %s' % (timer()-t1))
+    eig_T=T.get_eigenvals()
+    print('Elapsed time for regular configuration: %s' % (timer()-t1))
 
-    print('Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     print(sys.getsizeof(T.elements))
     print(sys.getsizeof(T))
 
-
     from symmetric_configuration import *
+    t1=timer()
     SymConf.init_globals(base,N)
     TS=Transition(SymConf,rules)
     TS.compute(adjacency)
-    
+    TS_eig=TS.get_eigenvals()
+    print('Elapsed time for symmetric configuration: %s' % (timer()-t1))
