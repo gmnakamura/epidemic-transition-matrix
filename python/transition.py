@@ -21,7 +21,7 @@ class Transition(object):
         rules may include only non-diagonal contributions.
 
         Ex. (SIS/SI)
-           rules={'1':('0',beta), '01':('11',alpha), '10':('11',alpha)}
+           rules={'1':[('0',beta)], '01':[('11',alpha)], '10':[('11',alpha)]}
         """
         self.rules=rules # depends on problem
 
@@ -35,9 +35,9 @@ class Transition(object):
         conf via one-body transformations."""
         cconf=conf.get()
         for k in range(conf.get_dimension()):
-            if cconf[k] in self.rules:
-                trial =cconf[:k]+self.rules[cconf[k]][0]+cconf[k+1:]                
-                output[trial]=self.rules[cconf[k]][1]
+            for rule in (self.rules.get(cconf[k]) or []):
+                trial =cconf[:k]+rule[0]+cconf[k+1:]                
+                output[trial]=rule[1]
         return output
 
     def twobody(self,conf,A,output={}):
@@ -56,16 +56,13 @@ class Transition(object):
                 # pair = two-node state string (key for self.rules).
                 pair = sj+cconf[i]
                 # check if pair produces non-diagonal transitions
-                if pair in self.rules: # fast O(1) lookup
-                    out=self.rules[pair] #tuple out=(outcome,coupling)
-                    newj =out[0][0]
-                    newi =out[0][1]
+                for rule in (self.rules.get(pair) or []):
                     # new configuration
-                    trial=trialj+newj+cconf[j+1:i]+newi+cconf[i+1:]
+                    trial=trialj+rule[0][0]+cconf[j+1:i]+rule[0][1]+cconf[i+1:]
                     if trial not in output: # ***bottleneck***                        
                         output[trial]=0
                     # update coupling
-                    output[trial] += out[1]*A[j][i] 
+                    output[trial] += rule[1]*A[j][i] 
         return output
 
     
@@ -96,7 +93,7 @@ class Transition(object):
         # run over all possible configurations using integer representation
         for k in range(basemax):
             element=Configuration(k)
-            n=element.get_count()
+            n=element.get_count('1')
             self.elements[n][element.get()]=self.compute_column(element,A)
         return None
 
@@ -107,9 +104,9 @@ if __name__ == "__main__":
 
     beta =0.100
     alpha=0.001
-    rules={'1':('0',beta), '01':('11',alpha), '10':('11',alpha)}
+    rules={'1':[('0',beta)], '01':[('11',alpha)], '10':[('11',alpha)]}
     base =2
-    N    =3
+    N    =4
 
     
     Nmax=20
@@ -117,23 +114,6 @@ if __name__ == "__main__":
     size=[0]*Nmax
     time=[0]*Nmax
     
-    
-    # repeat_max=10
-    # for N in range(Nmin,Nmax):
-    #     Configuration().init_globals(base,N)
-    #     adjacency=[ [1]*N for i in range(N) ]
-    #     for k in range(N):
-    #         adjacency[k][k]=0
-
-    #     t1=timer()
-    #     for repeat in range(repeat_max):
-    #         T=Transition(rules)
-    #         T.compute(adjacency)
-    #     t2=timer()
-    #     time[N]=(t2-t1)/repeat_max
-    #     size[N]=sys.getsizeof(T)
-    #     print(N,size[N],time[N])
-
 
     import resource
     print('Memory usage: %s (kb)' % resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)

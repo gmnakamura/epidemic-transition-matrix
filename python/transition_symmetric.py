@@ -1,4 +1,6 @@
 from math import *
+import scipy
+from scipy import linalg
 
 class Transition(object):
     """ Transition matrix.
@@ -9,7 +11,8 @@ class Transition(object):
     def __init__(self,_class,rules={}):
         self.rules=rules
         self._class=_class # define the class of vector object (symconf, configuration)
-        self.elements={ n:{} for n in range(_class.dimension*(_class.base-1)+1) }
+        #self.elements={ n:{} for n in range(_class.dimension*(_class.base-1)+1) }
+        self.elements={}
         self.symmetries={}
 
     def set_rules(self,rules=None):
@@ -26,8 +29,6 @@ class Transition(object):
         """
         self.rules=rules # depends on problem
 
-    def get_matrix(self):
-        pass
 
     # non-diagonal one body operator action
     # must be called before two-body
@@ -76,6 +77,23 @@ class Transition(object):
                     output[trial]=rule[1]*A[j][i]*sqrt(rep*repc)+(output.get(trial) or 0)
         return output
 
+    def diagonal(self,conf,A):
+        contrib=1.0
+        cconf=conf.get()
+        size=conf.get_dimension()
+        for k in range(size):
+            for rule in (self.rules.get(cconf[k]) or []):
+                contrib=contrib - rule[1]
+                print(conf,rule,' one',contrib)
+                
+        for j in range(size):
+            sj     =cconf[j]
+            for i in range((j+1),size): 
+                pair = sj+cconf[i]
+                for rule in (self.rules.get(pair) or []):
+                    contrib=contrib - rule[1]*A[j][i]
+                    print(conf,rule,' two',contrib)
+        return contrib
     
     def compute_column(self,conf,A):
         """ returns all available transitions for a given
@@ -86,11 +104,11 @@ class Transition(object):
         1) Carolina task #1
         """
         output={}
-        # non-diagonal contributions
+        #non-diagonal contributions
         output= self.onebody(conf,output)   #1) use output1 = ..
-        output= self.twobody(conf,A,output) #2) use output2 = ..  and merge dicts with update() 
-        # diagonal contributions
-        output[conf.get()]=1-sum( output.values() ) 
+        output= self.twobody(conf,A,output) #2) use output2 = ..  merge 
+        #output[conf.get()]=1-sum( output.values() )
+        output[conf.get()]=self.diagonal(conf,A)+(output.get(conf.get()) or 0.0)
         return output
 
 
@@ -101,9 +119,25 @@ class Transition(object):
                  ={ out_conf_0:coup_0, out_conf_1 : coup_1,...}
         """        
         for element in (self._class.get_basis() or []):            
-            n=element.get_count('1')
-            self.elements[n][element.get()]=self.compute_column(element,A)
+            # n=element.get_count('1')
+            # self.elements[n][element.get()]=self.compute_column(element,A)
+            self.elements[element.get()]=self.compute_column(element,A)
         return None
+
+    def get_matrix(self):
+        """ convert self.elements into numpy array"""
+        n=len(self.elements.keys())
+        matrix = scipy.zeros(shape=(n,n))
+        index  = {x:y for x,y in zip(self.elements.keys(),range(n))}
+        for state in self.elements.keys():
+            j = index[state]
+            for out in self.elements[state]:
+                i = index[out]
+                matrix[j][i]=self.elements[state][out]
+        return matrix.transpose(),index
+
+    def get_eigenvals(self):
+        return scipy.linalg.eigvals(self.get_matrix()[0])
 
 if __name__ == "__main__":
     
@@ -111,8 +145,8 @@ if __name__ == "__main__":
     from timeit import default_timer as timer
     from configuration import Configuration
 
-    beta =0.100
-    alpha=0.001
+    beta =0.001
+    alpha=0.100
     rules={'1':[('0',beta)], '01':[('11',alpha)], '10':[('11',alpha)]}
     base =2
     N    =4
